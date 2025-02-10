@@ -394,3 +394,33 @@ r2 = evaluator.evaluate(predictions, {evaluator.metricName: "r2"})
 
 print(f"Root Mean Squared Error (RMSE): {rmse:.2f}")
 print(f"R² (Coefficient of Determination): {r2:.2f}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC - Trying without the country and item categorical data
+
+# COMMAND ----------
+
+regression_assembler = VectorAssembler(inputCols=["pca_features"], outputCol="final_features")
+regression_model = LinearRegression(featuresCol="final_features", labelCol="Yield")
+regression_pipeline = Pipeline(stages=[country_indexer, item_indexer, country_encoder, item_encoder, pca_assembler, pca_scaler, pca, regression_assembler, regression_model])
+model = regression_pipeline.fit(features_df)
+
+# COMMAND ----------
+
+train_data, test_data = features_df.randomSplit([0.8, 0.2])
+model = regression_pipeline.fit(train_data)
+predictions = model.transform(test_data)
+
+evaluator = RegressionEvaluator(labelCol="Yield", predictionCol="prediction", metricName="rmse")
+rmse = evaluator.evaluate(predictions)
+r2 = evaluator.evaluate(predictions, {evaluator.metricName: "r2"})
+
+print(f"Root Mean Squared Error (RMSE): {rmse:.2f}")
+print(f"R² (Coefficient of Determination): {r2:.2f}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC - So as we can see the country and item categorical data is very important to have in the model, even though it did not make a difference in the PCA model

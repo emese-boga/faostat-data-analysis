@@ -17,7 +17,7 @@
 
 import warnings
 
-from pyspark.sql.functions import monotonically_increasing_id, regexp_replace, col, lit, format_number
+from pyspark.sql.functions import monotonically_increasing_id, regexp_replace, col, lit, format_number, round
 
 
 warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
@@ -148,13 +148,13 @@ df.write.format("delta").mode("overwrite").saveAsTable("agriculture_db.urban_pop
 # COMMAND ----------
 
 df = spark.read.csv(blob_url + "Share-Of-GDP-From-Agriculture.csv", header=True, inferSchema=True)
-df.columns
 
 # COMMAND ----------
 
 df = df \
     .withColumnRenamed("Entity", "Country") \
     .withColumnRenamed("Agriculture, forestry, and fishing, value added (% of GDP)", "GDP")
+df = df.withColumn("GDP", round(col("GDP"), 2))
 
 # COMMAND ----------
 
@@ -373,11 +373,38 @@ df = df.filter(df["Year"] > 1960) \
     .withColumnRenamed("Code", "ISO3") \
     .withColumnRenamed("year", "Year") \
     .withColumnRenamed("Average surface temperature4", "Temperature")
-df = df.withColumn("Temperature", format_number("Temperature", 2))
+df = df.withColumn("Temperature", format_number("Temperature", 2).cast("double"))
 
 # COMMAND ----------
 
 df.write.format("delta").mode("overwrite").saveAsTable("agriculture_db.average_surface_temperature")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Nitrogen fertilizer use per hectar of cropland
+# MAGIC
+# MAGIC - Application of nitrogen fertilizer, measured in kilograms of total nutrient per hectare of cropland
+# MAGIC - Source: https://ourworldindata.org/fertilizers also used in this source which includes country ISO3 codes https://ourworldindata.org/grapher/cereal-crop-yield-vs-fertilizer-application
+# MAGIC - I used the second source so joining will be easier moving forward
+# MAGIC - Contains data from **1961** - **2021**
+
+# COMMAND ----------
+
+df = spark.read.csv(blob_url + "Nitrogen-Fertilizer-Use-Per-Hectare-Of-Cropland.csv", header=True, inferSchema=True)
+
+# COMMAND ----------
+
+df = df.drop("Cereals | 00001717 || Yield | 005419 || tonnes per hectare", "World regions according to OWID")
+df = df.withColumnRenamed("Entity", "Country") \
+    .withColumnRenamed("Code", "ISO3") \
+    .withColumnRenamed("Nutrient nitrogen N (total) | 00003102 || Use per area of cropland | 005159 || Kilograms per hectare", "FertilizerUse")
+df = df.na.drop(subset=["ISO3"]) \
+    .withColumn("FertilizerUse", format_number("FertilizerUse", 3).cast("double"))
+
+# COMMAND ----------
+
+df.write.format("delta").mode("overwrite").saveAsTable("agriculture_db.fertilizer_use")
 
 # COMMAND ----------
 
