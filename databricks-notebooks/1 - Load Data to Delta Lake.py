@@ -39,6 +39,10 @@ df = spark.read.csv(blob_url + "Production_Crops_Livestock_E_All_Data.csv", head
 
 # COMMAND ----------
 
+df.select("Item", "Item Code (CPC)", "Element Code", "Element", "Unit").show()
+
+# COMMAND ----------
+
 df = df.drop("Item Code (CPC)")
 
 # COMMAND ----------
@@ -112,6 +116,20 @@ df = df.withColumnRenamed("Area", "Country")
 # COMMAND ----------
 
 df.write.format("delta").mode("overwrite").saveAsTable("agriculture_db.crop_yield")
+
+# COMMAND ----------
+
+df = spark.read.csv(blob_url + "Production_Crops_Categories.csv", header=True, inferSchema=True)
+
+# COMMAND ----------
+
+df = df.select("Item Group", "Item Code", "Item") \
+        .withColumnRenamed("Item Group", "Category") \
+        .withColumnRenamed("Item Code", "ItemCode")
+
+# COMMAND ----------
+
+df.write.format("delta").mode("overwrite").saveAsTable("agriculture_db.crop_categories")
 
 # COMMAND ----------
 
@@ -405,6 +423,56 @@ df = df.na.drop(subset=["ISO3"]) \
 # COMMAND ----------
 
 df.write.format("delta").mode("overwrite").saveAsTable("agriculture_db.fertilizer_use")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Number of people employed in agriculture
+# MAGIC
+# MAGIC - Employment includes anyone engaged in any activity to produce goods or services for pay or profit
+# MAGIC - Source: https://ourworldindata.org/grapher/number-of-people-employed-in-agriculture?tab=map&time=1991
+# MAGIC - Contains relevant data from **1991** - **2021**
+
+# COMMAND ----------
+
+df = spark.read.csv(blob_url + "Number-Of-People-Employed-In-Agriculture.csv", header=True, inferSchema=True)
+
+# COMMAND ----------
+
+df = df.filter(df["Year"] > 1991) \
+        .withColumnRenamed("Entity", "Country") \
+        .withColumnRenamed("Code", "ISO3") \
+        .withColumnRenamed("number_employed_agri", "PeopleEmployedInAgriculture")
+
+# COMMAND ----------
+
+df.write.format("delta").mode("overwrite").saveAsTable("agriculture_db.people_employed_in_agriculture")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Annual freshwater withdrawals
+# MAGIC - Total water withdrawals are the sum of withdrawals for agriculture, industry and municipal (domestic uses)
+# MAGIC - Withdrawals also include water from desalination plants in countries where
+# MAGIC they are a significant source
+# MAGIC - Source: https://ourworldindata.org/grapher/annual-freshwater-withdrawals?time=1995
+# MAGIC - Contains relevant data from **1995** - **2021**
+
+# COMMAND ----------
+
+df = spark.read.csv(blob_url + "Annual-Freshwater-Withdrawals.csv", header=True, inferSchema=True)
+
+# COMMAND ----------
+
+df = df.filter(df["Year"] > 1995) \
+        .withColumnRenamed("Entity", "Country") \
+        .withColumnRenamed("Code", "ISO3") \
+        .withColumnRenamed("Annual freshwater withdrawals, total (billion cubic meters)", "FreshwaterWithdrawal")
+df = df.withColumn("FreshwaterWithdrawal", round(col("FreshwaterWithdrawal") / 1_000_000_000, 3))
+
+# COMMAND ----------
+
+df.write.format("delta").mode("overwrite").saveAsTable("agriculture_db.freshwater_withdrawal")
 
 # COMMAND ----------
 
